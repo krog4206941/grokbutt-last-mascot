@@ -8,9 +8,9 @@ const EDEF = {
   dotS:     { r: 8,  hp: 1,  spd: 140, score: 25,  contact: 6 },
   plush:    { r: 17, hp: 5,  spd: 64,  score: 140, contact: 6 },
   clawdlet: { r: 15, hp: 4,  spd: 72,  score: 140, contact: 7 },
-  bigdot:   { r: 30, hp: 26, spd: 0,   score: 900, contact: 12, boss: 'dotz' },
-  jolly:    { r: 46, hp: 170, spd: 58, score: 3000, contact: 12, boss: 'jolly' },
-  claw:     { r: 50, hp: 190, spd: 60, score: 3000, contact: 14, boss: 'claw' },
+  bigdot:   { r: 30, hp: 28, spd: 0,   score: 900, contact: 12, boss: 'dotz' },
+  jolly:    { r: 46, hp: 185, spd: 58, score: 3000, contact: 12, boss: 'jolly' },
+  claw:     { r: 50, hp: 205, spd: 60, score: 3000, contact: 14, boss: 'claw' },
 };
 const RIVAL_NAME = { dotz: 'DOTZ CREW', jolly: 'JOLLYBOB', claw: 'CLAWDETH' };
 const RIVAL_COL = { dotz: '#b6ff3b', jolly: '#e7cfa8', claw: PAL.terra, grok: PAL.gold };
@@ -97,7 +97,7 @@ function spawnDotz(n = 5, hpMul = 1) {
   DZ = { st: 'orbit', t: 0, ang: 0, cycle: 0, slow: hpMul < 1 ? 1.35 : 1 };
   const cols = DOTCOLS.slice(0, n);
   cols.forEach((col, i) => {
-    const e = spawnEnemy('bigdot', ARENA_C.x + Math.cos(i / n * TAU) * 160, B.t + 10, { col, idx: i, z: 260, hp: Math.round(26 * hpMul), maxhp: Math.round(26 * hpMul) });
+    const e = spawnEnemy('bigdot', ARENA_C.x + Math.cos(i / n * TAU) * 160, B.t + 10, { col, idx: i, z: 260, hp: Math.round(28 * hpMul), maxhp: Math.round(28 * hpMul) });
     e.tx = e.x; e.ty = e.y;
   });
 }

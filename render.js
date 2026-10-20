@@ -181,7 +181,10 @@ function drawBlastFx(c, b) {
   const k = b.t / 0.35, R = b.range * (0.35 + 0.65 * Math.min(1, k * 2.2));
   c.save(); c.globalAlpha = (1 - k) * (0.55 + 0.35 * b.k); c.globalCompositeOperation = 'lighter';
   c.translate(b.x, b.y); c.scale(1, 0.75);
-  const g = c.createRadialGradient(0, 0, 10, 0, 0, R); g.addColorStop(0, 'rgba(255,240,200,0.9)'); g.addColorStop(0.6, 'rgba(255,190,90,0.55)'); g.addColorStop(1, 'rgba(255,150,60,0)');
+  const g = c.createRadialGradient(0, 0, 10, 0, 0, R);
+  if (b.col === 'think') { g.addColorStop(0, 'rgba(237,233,254,0.9)'); g.addColorStop(0.6, 'rgba(139,92,246,0.6)'); g.addColorStop(1, 'rgba(139,92,246,0)'); }
+  else if (b.col === 'imagine') { g.addColorStop(0, 'rgba(255,237,213,0.8)'); g.addColorStop(0.6, 'rgba(249,115,22,0.5)'); g.addColorStop(1, 'rgba(249,115,22,0)'); }
+  else { g.addColorStop(0, 'rgba(255,240,200,0.9)'); g.addColorStop(0.6, 'rgba(255,190,90,0.55)'); g.addColorStop(1, 'rgba(255,150,60,0)'); }
   c.fillStyle = g; c.beginPath(); c.moveTo(0, 0); c.arc(0, 0, R, b.a - 0.62, b.a + 0.62); c.closePath(); c.fill();
   c.strokeStyle = 'rgba(255,255,255,0.8)'; c.lineWidth = 3 + 4 * b.k; c.beginPath(); c.arc(0, 0, R, b.a - 0.55, b.a + 0.55); c.stroke();
   for (let i = 0; i < 5; i++) { const a = b.a + (i - 2) * 0.22, r = R * (0.5 + 0.1 * i); c.fillStyle = 'rgba(255,230,170,0.35)'; c.beginPath(); c.arc(Math.cos(a) * r, Math.sin(a) * r, 8 + 10 * b.k, 0, TAU); c.fill(); }
@@ -219,12 +222,61 @@ function drawPlayer(c) {
   drawGrokButt(c, p.x, p.y, p.r, p.aim, { bob, shy: p.shy / 100, t: p.t, flash: p.flash, charge: p.holding ? p.charge : 0, lookAway: p.stare > 0, blink: p.blink, squint: p.hugged > 0 });
   if (p.hugged > 0) bubble(c, p.x, p.y - 48, 'WIGGLE OUT!', '#3b8fd1');
 }
+// ---------- power-up visuals ----------
+function puGlyph(c, id, s) { // dark glyph on a colored app-icon tile; s = half size
+  c.save(); c.strokeStyle = '#120712'; c.fillStyle = '#120712'; c.lineWidth = s * 0.18; c.lineCap = 'round'; c.lineJoin = 'round';
+  if (id === 'deepsearch') { c.beginPath(); c.arc(-s * 0.12, -s * 0.12, s * 0.38, 0, TAU); c.stroke(); c.beginPath(); c.moveTo(s * 0.16, s * 0.16); c.lineTo(s * 0.5, s * 0.5); c.stroke(); }
+  else if (id === 'think') { for (let i = 0; i < 3; i++) { c.beginPath(); c.arc((i - 1) * s * 0.36, s * 0.05, s * 0.11, 0, TAU); c.fill(); } c.lineWidth = s * 0.12; rr(c, -s * 0.62, -s * 0.42, s * 1.24, s * 0.84, s * 0.3); c.stroke(); }
+  else if (id === 'imagine') { c.beginPath(); for (let k = 0; k < 8; k++) { const r = k % 2 ? s * 0.18 : s * 0.6, a = k / 8 * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); }
+  else if (id === 'voice') { [0.3, 0.7, 1, 0.55, 0.85].forEach((h, i) => { c.fillRect((i - 2) * s * 0.26 - s * 0.08, -h * s * 0.5, s * 0.16, h * s); }); }
+  else if (id === 'fun') { c.beginPath(); c.moveTo(s * 0.12, -s * 0.62); c.lineTo(-s * 0.36, s * 0.08); c.lineTo(-s * 0.02, s * 0.08); c.lineTo(-s * 0.14, s * 0.62); c.lineTo(s * 0.38, -s * 0.12); c.lineTo(s * 0.04, -s * 0.12); c.closePath(); c.fill(); }
+  c.restore();
+}
+function puTile(c, id, x, y, s, glow) {
+  const d = PU_DEF[id];
+  c.save(); c.translate(x, y);
+  if (glow) { c.shadowColor = d.col; c.shadowBlur = glow; }
+  const g = c.createLinearGradient(0, -s, 0, s); g.addColorStop(0, d.col2); g.addColorStop(1, d.col);
+  c.fillStyle = g; rr(c, -s, -s, s * 2, s * 2, s * 0.45); c.fill(); c.shadowBlur = 0;
+  c.strokeStyle = '#120712'; c.lineWidth = 2; c.stroke();
+  puGlyph(c, id, s * 0.9); c.restore();
+}
+function drawPickup(c, k) {
+  if (k.life - k.t < 3 && Math.floor(k.t * 8) % 2) return;
+  const d = PU_DEF[k.id], bob = Math.sin(k.t * 4) * 4, y = k.y - 26 - k.z + bob;
+  c.save(); c.globalAlpha = 0.4; c.fillStyle = '#000'; c.beginPath(); c.ellipse(k.x, k.y, 18, 6, 0, 0, TAU); c.fill(); c.restore();
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.35 + 0.2 * Math.sin(k.t * 6);
+  c.strokeStyle = d.col; c.lineWidth = 3; c.translate(k.x, y); c.rotate(k.t); rr(c, -26, -26, 52, 52, 12); c.stroke(); c.restore();
+  c.save(); c.translate(k.x, y); c.rotate(Math.sin(k.t * 2) * 0.15); puTile(c, k.id, 0, 0, 17, 16); c.restore();
+  c.save(); c.textAlign = 'center'; c.textBaseline = 'middle'; strokeText(c, d.name, k.x, y - 30, 11, d.col2, '#120712', 4); c.restore();
+}
+function drawPUShot(c, b) {
+  c.save();
+  if (b.kind === 'seek') { // blue search comet with a diamond head
+    const a = Math.atan2(b.vy, b.vx); c.translate(b.x, b.y - 16); c.rotate(a);
+    c.globalCompositeOperation = 'lighter'; const g = c.createLinearGradient(-34, 0, 0, 0); g.addColorStop(0, 'rgba(59,130,246,0)'); g.addColorStop(1, 'rgba(147,197,253,0.9)');
+    c.fillStyle = g; c.beginPath(); c.moveTo(-34, -3); c.lineTo(0, -5); c.lineTo(0, 5); c.lineTo(-34, 3); c.fill();
+    c.globalCompositeOperation = 'source-over'; c.fillStyle = '#3b82f6'; c.strokeStyle = '#dbeafe'; c.lineWidth = 1.5;
+    c.beginPath(); c.moveTo(9, 0); c.lineTo(0, -7); c.lineTo(-6, 0); c.lineTo(0, 7); c.closePath(); c.fill(); c.stroke();
+  } else { // FUN MODE bouncing butt star
+    c.translate(b.x, b.y - 14); c.rotate(b.rot); c.fillStyle = b.col; c.strokeStyle = '#120712'; c.lineWidth = 1.5;
+    c.beginPath(); for (let k = 0; k < 10; k++) { const r = k % 2 ? 4.5 : 11, a = k / 10 * TAU - Math.PI / 2; c.lineTo(Math.cos(a) * r, Math.sin(a) * r); } c.closePath(); c.fill(); c.stroke();
+  }
+  c.restore();
+}
+function drawClone(c, cl) {
+  const p = player;
+  c.save(); c.globalCompositeOperation = 'lighter'; c.globalAlpha = 0.35 + 0.15 * Math.sin(p.t * 8 + cl.i);
+  c.strokeStyle = PU_DEF.imagine.col; c.lineWidth = 3; c.beginPath(); c.arc(cl.x, cl.y - 2, p.r + 5, 0, TAU); c.stroke(); c.restore();
+  drawGrokButt(c, cl.x, cl.y, p.r, p.aim, { alpha: 0.62, t: p.t + cl.i, bob: Math.abs(Math.sin(p.t * 9 + cl.i)) * 3 });
+}
 function drawWorld(c) {
   c.drawImage(bgCanvas, 0, 0, W, H);
   drawBeams(c, stateT, player);
   drawTele(c);
   for (const h of hazards) if (!h.slammed) drawForm(c, h);
   for (const l of loot) drawLoot(c, l);
+  for (const k of PU.pickups) drawPickup(c, k);
   for (const b of ebullets) if (b.kind === 'ring') drawBullet(c, b);
   // y-sorted actors
   const list = [];
@@ -232,13 +284,15 @@ function drawWorld(c) {
   for (const b of blocks) list.push({ y: b.y + b.s, f: () => drawBlock(c, b) });
   for (const h of hazards) if (h.slammed) list.push({ y: h.y + h.h / 2, f: () => drawForm(c, h) });
   if (player) list.push({ y: player.y, f: () => drawPlayer(c) });
+  for (const cl of PU.clones) list.push({ y: cl.y, f: () => drawClone(c, cl) });
   list.sort((a, b) => a.y - b.y);
   for (const o of list) o.f();
   for (const b of blasts) drawBlastFx(c, b);
   for (const b of ebullets) if (b.kind !== 'ring') drawBullet(c, b);
+  for (const b of PU.shots) drawPUShot(c, b);
   for (const e of enemies) drawEnemyShadowInfo(c, e);
   drawParts(c);
-  for (const r of fxRings) { c.save(); c.globalAlpha = 1 - r.t / 0.8; c.strokeStyle = PAL.gold; c.lineWidth = 16; c.beginPath(); c.ellipse(r.x, r.y, r.R, r.R * 0.6, 0, 0, TAU); c.stroke(); c.restore(); }
+  for (const r of fxRings) { c.save(); c.globalAlpha = Math.max(0, 1 - r.t / (r.maxT || 0.8)); c.strokeStyle = r.col || PAL.gold; c.lineWidth = r.col ? 8 : 16; c.beginPath(); c.ellipse(r.x, r.y, r.R, r.R * 0.6, 0, 0, TAU); c.stroke(); c.restore(); }
   drawPops(c);
   c.drawImage(fgCanvas, 0, H - 60, W, 60);
 }
@@ -282,13 +336,21 @@ function drawHUD(c) {
   c.textAlign = 'left'; c.font = `bold 9px ${FONT}`; c.fillStyle = PAL.gold2;
   c.fillText('SHY POWER x' + shyPower().toFixed(1) + '   SPEED ' + Math.round(100 - 50 * shy) + '%', 56, 51);
   // FULL MOON meter
-  const mfull = p.moon >= 100;
+  const mfull = p.moon >= 100 && p.moonCd <= 0;
   panel(c, 10, 64, 186, 26);
   moonIcon(c, 26, 77, 9, mfull ? 1 : 0.6);
   c.fillStyle = 'rgba(255,255,255,0.1)'; rr(c, 40, 72, 146, 10, 5); c.fill();
   c.fillStyle = mfull ? (Math.floor(stateT * 8) % 2 ? '#fff4dc' : PAL.gold) : PAL.gold; if (p.moon > 2) { rr(c, 40, 72, Math.max(10, 146 * p.moon / 100), 10, 5); c.fill(); }
   if (mfull) { c.font = `900 9px ${FONT}`; c.fillStyle = '#3a2406'; c.textAlign = 'center'; c.fillText(ctrlMode === 'touch' ? 'FULL MOON · TAP THE BUTTON' : 'FULL MOON READY · PRESS E', 113, 77.5); }
-  else { c.font = `bold 8px ${FONT}`; c.fillStyle = '#fff4dc'; c.textAlign = 'center'; c.fillText('FULL MOON', 113, 77.5); }
+  else { c.font = `bold 8px ${FONT}`; c.fillStyle = '#fff4dc'; c.textAlign = 'center'; c.fillText(p.moonCd > 0 ? 'FULL MOON RECHARGING ' + Math.ceil(p.moonCd) + 's' : 'FULL MOON ' + Math.floor(p.moon) + '%', 113, 77.5); }
+  if (PU.active) {
+    const d = PU_DEF[PU.active], k = PU.t / PU_TIME;
+    panel(c, 10, 94, 186, 30); puTile(c, PU.active, 27, 109, 10, 0);
+    c.textAlign = 'left'; c.font = `900 10px ${FONT}`; c.fillStyle = d.col2; c.fillText('GROK: ' + d.name, 42, 103);
+    c.textAlign = 'right'; c.fillStyle = '#fff4dc'; c.fillText(Math.ceil(PU.t) + 's', 188, 103);
+    c.fillStyle = 'rgba(255,255,255,0.1)'; rr(c, 42, 110, 146, 7, 3.5); c.fill();
+    c.fillStyle = PU.t < 2.5 && Math.floor(stateT * 8) % 2 ? '#fff4dc' : d.col; rr(c, 42, 110, Math.max(7, 146 * k), 7, 3.5); c.fill();
+  }
   // round + score
   panel(c, W - 196, 10, 186, 50);
   c.textAlign = 'right'; c.font = `900 15px ${FONT}`; c.fillStyle = PAL.gold;
@@ -325,7 +387,7 @@ function drawWins(c) { // system window pop-ups
   let y = 104;
   for (const w of wins) {
     const k = w.t, a = k < 0.12 ? k / 0.12 : w.life - k < 0.3 ? (w.life - k) / 0.3 : 1, s = k < 0.12 ? 0.8 + 0.2 * k / 0.12 : 1;
-    const ww = 206, hh = 22 + w.lines.length * 14, x = W - ww - 10;
+    const ww = 236, hh = 22 + w.lines.length * 14, x = W - ww - 10;
     c.save(); c.globalAlpha = a; c.translate(x + ww / 2, y + hh / 2); c.scale(s, s); c.translate(-ww / 2, -hh / 2);
     c.fillStyle = 'rgba(14,8,18,0.92)'; rr(c, 0, 0, ww, hh, 7); c.fill(); c.strokeStyle = w.col; c.lineWidth = 1.5; c.stroke();
     c.fillStyle = w.col; rr(c, 0, 0, ww, 15, 7); c.fill(); c.fillRect(0, 8, ww, 7);
@@ -358,7 +420,7 @@ function drawTouchUI(c) {
     c.globalAlpha = 0.5; c.fillStyle = '#fff4dc'; c.beginPath(); c.arc(input.joy.ox + (d ? dx / d * m : 0), input.joy.oy + (d ? dy / d * m : 0), 20, 0, TAU); c.fill();
   } else if (stateT < 12) { c.globalAlpha = 0.5; c.font = `bold 11px ${FONT}`; c.fillStyle = '#fff4dc'; c.textAlign = 'center'; c.fillText('◀ DRAG TO MOVE', 110, H - 76); c.fillText('TAP = BUMP · HOLD = BLAST ▶', 500, H - 76); }
   if (input.fire) { c.globalAlpha = 0.35; c.strokeStyle = PAL.gold; c.lineWidth = 3; c.beginPath(); c.arc(input.fire.ox, input.fire.oy, 34 + (player ? player.charge * 16 : 0), 0, TAU); c.stroke(); }
-  if (player && player.moon >= 100) {
+  if (player && player.moon >= 100 && player.moonCd <= 0) {
     const s = 1 + 0.08 * Math.sin(stateT * 10);
     c.globalAlpha = 0.95; c.translate(MOONBTN.x, MOONBTN.y); c.scale(s, s);
     c.fillStyle = 'rgba(12,6,16,0.85)'; c.beginPath(); c.arc(0, 0, MOONBTN.r, 0, TAU); c.fill(); c.strokeStyle = PAL.gold; c.lineWidth = 3; c.stroke();
@@ -511,7 +573,7 @@ function drawPause(c) {
   c.textAlign = 'center'; c.textBaseline = 'middle';
   strokeText(c, 'PAUSED', 320, 200, 48, PAL.gold, '#120712', 9);
   c.font = `bold 13px ${FONT}`; c.fillStyle = '#fff4dc';
-  const L = ['PHONE: drag the left side to move', 'Right side: TAP = BUTT BUMP (dash), HOLD + release = BUTT BLAST', 'PC: WASD/arrows move · mouse aims the butt', 'Click / Space: tap = BUMP, hold = BLAST · E or Shift = FULL MOON', 'P pause · M mute', '', 'Keep your butt toward rivals: faces make GROKBUTT shy.', 'Shyer = slower, but SHY POWER makes the butt hit harder.'];
+  const L = ['PHONE: drag the left side to move', 'Right side: TAP = BUTT BUMP (dash), HOLD + release = BUTT BLAST', 'PC: WASD/arrows move · mouse aims the butt', 'Click / Space: tap = BUMP, hold = BLAST · E or Shift = FULL MOON', 'P pause · M mute', 'Grab GROK power-up tiles (9 s each): DeepSearch, Think, Imagine, Voice, Fun', 'Keep your butt toward rivals: faces make GROKBUTT shy.', 'Shyer = slower, but SHY POWER makes the butt hit harder.'];
   L.forEach((l, i) => c.fillText(l, 320, 260 + i * 22));
   if (!hasFocus) { c.fillStyle = PAL.teal; c.fillText('Click the game to use the keyboard', 320, 460); }
   strokeText(c, ctrlMode === 'touch' ? 'TAP TO RESUME' : 'CLICK / P TO RESUME', 320, 500, 22, PAL.gold, '#120712', 5);
@@ -529,6 +591,7 @@ function render() {
   drawWorld(ctx);
   ctx.restore();
   if (flashT > 0) lighten(ctx, '#fff4dc', flashT * 0.5);
+  if (puOn('think')) { ctx.save(); const vg = ctx.createRadialGradient(320, 360, 200, 320, 360, 470); vg.addColorStop(0, 'rgba(76,29,149,0)'); vg.addColorStop(1, 'rgba(76,29,149,0.45)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H); ctx.font = `900 12px ${FONT}`; ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(196,181,253,' + (0.6 + 0.3 * Math.sin(stateT * 5)) + ')'; ctx.fillText('THINKING' + '.'.repeat(1 + Math.floor(stateT * 3) % 3), 320, 590); ctx.restore(); }
   if (freezeT > 0) drawFreeze(ctx);
   drawHUD(ctx);
   drawBanner(ctx);
@@ -550,6 +613,8 @@ window.__gb = {
   spawn(t, x, y, o) { return spawnEnemy(t, x, y, o); }, setShy(v) { player.shy = v; }, setMoon(v) { player.moon = v; },
   quiet() { resetWorld(); spawns = []; phase = 'hold'; }, lose() { player.shy = 100; loseGame(); }, win() { winGame(); },
   set timeScale(v) { timeScale = v; }, moon() { tryFullMoon(); }, blast(k) { blast(k); },
-  aim(a) { player.aim = a; }, boss(id) { spawnBoss(id); }, banner: showBanner,
+  aim(a) { player.aim = a; }, givePU(id) { puGive(id); }, dropPU(id, x, y) { PU.pickups = []; puDrop(x, y, id); }, get pu() { return { active: PU.active, t: PU.t, pickups: PU.pickups.length, shots: PU.shots.length }; },
+  get uses() { return { moons: moonUses, powerups: puUses, time: Math.round(timeAlive) }; },
+  get moonState() { return { moon: player.moon, cd: player.moonCd }; }, bump() { bump(); }, hold(on) { if (on) HOOK.attackDown('test'); else HOOK.attackUp('test'); }, boss(id) { spawnBoss(id); }, banner: showBanner,
 };
 requestAnimationFrame(frame);

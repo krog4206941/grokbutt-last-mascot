@@ -4,6 +4,7 @@ let state = 'title', stateT = 0, paused = false, god = false;
 let player = null, enemies = [], ebullets = [], hazards = [], blocks = [], tele = [], parts = [], pops = [], wins = [], spawns = [], loot = [], blasts = [], fxRings = [];
 let shake = 0, hitstop = 0, flashT = 0, freezeT = 0, critCd = 0, cutin = null, banner = null;
 let waveIdx = -1, waveT = 0, scriptI = 0, phase = 'fight', clearT = 0, bossSpawned = false;
+let moonUses = 0, puUses = 0;
 let score = 0, combo = 0, comboT = 0, kills = 0, timeAlive = 0, eliminated = [], best = 0, firstHurt = true, firstStare = true;
 let spot = { x: 320, y: 400 };
 const MAX_PARTS = 220, MAX_POPS = 26;
@@ -34,12 +35,12 @@ function showBanner(big, small, col = PAL.gold, life = 1.4) { banner = { big, sm
 function startCutin(o) { cutin = Object.assign({ t: 0, dur: 1.6, col: PAL.gold }, o); SFX.cutin(); }
 
 // ---------- game flow ----------
-function newPlayer() { return { x: ARENA_C.x, y: ARENA_C.y + 60, r: 19, vx: 0, vy: 0, aim: -Math.PI / 2, shy: 0, moon: 0, inv: 0, flash: 0, t: 0, holding: false, holdT: 0, charge: 0, cd: 0, dash: 0, dashA: 0, hitSet: null, hugged: 0, lastHit: 99, stare: 0, bob: 0, blink: 0 }; }
-function resetWorld() { enemies = []; ebullets = []; hazards = []; blocks = []; tele = []; spawns = []; loot = []; blasts = []; fxRings = []; DZ = null; }
+function newPlayer() { return { x: ARENA_C.x, y: ARENA_C.y + 60, r: 19, vx: 0, vy: 0, aim: -Math.PI / 2, shy: 0, moon: 0, moonCd: 0, inv: 0, flash: 0, t: 0, holding: false, holdT: 0, charge: 0, cd: 0, dash: 0, dashA: 0, hitSet: null, hugged: 0, lastHit: 99, stare: 0, bob: 0, blink: 0 }; }
+function resetWorld() { puReset(); enemies = []; ebullets = []; hazards = []; blocks = []; tele = []; spawns = []; loot = []; blasts = []; fxRings = []; DZ = null; }
 function startGame() {
   unlockAudio(); startMusic();
   player = newPlayer(); resetWorld(); parts = []; pops = []; wins = [];
-  score = 0; combo = 0; comboT = 0; kills = 0; timeAlive = 0; eliminated = []; firstHurt = true; firstStare = true;
+  score = 0; moonUses = 0; puUses = 0; combo = 0; comboT = 0; kills = 0; timeAlive = 0; eliminated = []; firstHurt = true; firstStare = true;
   state = 'play'; stateT = 0; paused = false; cutin = null; freezeT = 0;
   startWave(0);
 }
@@ -121,6 +122,7 @@ function loseGame() {
 function saveBest() { if (score > best) { best = score; try { localStorage.setItem('gb_lms_best', String(best)); } catch (_) {} } }
 
 // ---------- combat ----------
+const MOON_MINION = 1.4, MOON_BOSS = 0.5, MOON_CD = 20; // ~1 FULL MOON per round with good play
 const shyPower = () => 1 + 0.9 * (player.shy / 100);
 function hurtPlayer(dmg, fx, fy, why) {
   const p = player;
@@ -143,13 +145,14 @@ function hugPlayer(e, dmg) {
     e.grabby = false; if (e.st === 'hugrush') { e.st = 'walk'; e.stT = 0; } if (e.st === 'lunge') { e.st = 'rest'; e.stT = 0; }
   }
 }
-function damageEnemy(e, dmg, fx, fy, kb, force) {
+function damageEnemy(e, dmg, fx, fy, kb, force, moonK = 1) {
   if (e.dead || (e.airborne && !force) || (e.z > 60 && !force)) return false;
   const mult = e.weak ? 2 : 1, d = dmg * mult;
+  const dealt = Math.min(d, Math.max(0, e.hp));
   e.hp -= d; e.flash = 1;
   const a = Math.atan2(e.y - fy, e.x - fx);
   if (!e.boss) { e.kx += Math.cos(a) * kb; e.ky += Math.sin(a) * kb; } else { e.kx += Math.cos(a) * kb * 0.12; e.ky += Math.sin(a) * kb * 0.12; }
-  player.moon = Math.min(100, player.moon + d * (e.boss ? 1.1 : 2.2));
+  if (!force && player.moonCd <= 0 && state === 'play') player.moon = Math.min(100, player.moon + dealt * (e.boss ? MOON_BOSS : MOON_MINION) * moonK);
   score += Math.round(d * 10);
   pop(e.x + rnd(-8, 8), e.y - e.r * 2 - 10, (mult > 1 ? 'x2 ' : '') + Math.round(d * 10) / 10, mult > 1 ? '#ff9f43' : PAL.gold, mult > 1 ? 24 : 18, 0.7);
   if (e.type === 'jolly' || e.type === 'plush') fur(e.x, e.y - e.r, e.boss ? 6 : 4);
@@ -178,34 +181,43 @@ function killEnemy(e) {
     if (!e.boss) pop(e.x, e.y - 40, pick(['SEGFAULT', 'exit 1', 'KILLED']), PAL.terra, 18);
     else bossDown('claw', e);
   }
+  if (e.boss) puDrop(e.x, e.y + 20); else if (Math.random() < 0.06) puDrop(e.x, e.y);
   if (!e.boss && Math.random() < 0.13 && loot.length < 4) loot.push({ x: clamp(e.x, B.l + 20, B.r - 20), y: clamp(e.y, B.t + 20, B.b - 10), t: 0, life: 9 });
 }
 function bump() {
   const p = player;
   if (p.cd > 0) return;
-  p.dash = 0.15; p.dashA = p.aim; p.cd = 0.3; p.hitSet = new Set(); p.inv = Math.max(p.inv, 0.16);
+  p.dash = 0.15; p.dashA = p.aim; p.cd = puOn('fun') ? 0.18 : 0.3; p.hitSet = new Set(); p.inv = Math.max(p.inv, 0.16);
   SFX.bump(); puff(p.x, p.y + 10, 3, 'rgba(255,255,255,0.25)');
+  puOnAttack('bump', 0);
 }
 function blast(k) {
-  const p = player, a = p.aim, range = 105 + 125 * k, dmg = (3 + 7 * k) * shyPower();
+  const p = player;
   p.cd = 0.25;
-  blasts.push({ x: p.x, y: p.y, a, range, k, t: 0 });
   SFX.blast(k); addShake(4 + 9 * k); hitstop = Math.max(hitstop, 0.03 + 0.05 * k);
-  p.vx -= Math.cos(a) * 140 * k; p.vy -= Math.sin(a) * 140 * k;
+  p.vx -= Math.cos(p.aim) * 140 * k; p.vy -= Math.sin(p.aim) * 140 * k;
+  blastAt(p.x, p.y, p.aim, k, 1, true);
+  puOnAttack('blast', k);
+}
+function blastAt(ox, oy, a, k, mult, main) {
+  const think = puOn('think'), p = { x: ox, y: oy };
+  const range = (105 + 125 * k) * (think ? 1.35 : 1), dmg = (3 + 7 * k) * shyPower() * mult * (think ? 1.5 : 1);
+  blasts.push({ x: ox, y: oy, a, range, k, t: 0, col: think ? 'think' : !main ? 'imagine' : null });
   let hits = 0, bossHit = false;
   const inCone = (x, y, r) => { const d = Math.hypot(x - p.x, y - p.y); return d < range + r && Math.abs(angDiff(a, Math.atan2(y - p.y, x - p.x))) < 0.62 + r / Math.max(d, 1) * 0.6; };
-  for (const e of enemies) if (!e.dead && inCone(e.x, e.y, e.r)) { if (damageEnemy(e, dmg, p.x, p.y, 320 + 340 * k)) { hits++; if (e.boss) bossHit = true; } }
+  for (const e of enemies) if (!e.dead && inCone(e.x, e.y, e.r)) { if (damageEnemy(e, dmg, p.x, p.y, 320 + 340 * k, false, main ? 1 : 0.5)) { hits++; if (e.boss) bossHit = true; } }
+  if (!main) return;
   for (const b of ebullets) if (b.kind !== 'ring' && inCone(b.x, b.y, b.r)) { b.dead = true; burst(b.x, b.y, 3, ['#fff4dc', PAL.gold], 120); }
   for (const b of blocks) if (b.t >= b.rise && inCone(b.x + b.s / 2, b.y + b.s / 2, b.s / 2)) { b.hp -= k > 0.6 ? 2 : 1; if (b.hp <= 0) for (let i = 0; i < 4; i++) pixelBit(b.x + b.s / 2, b.y + b.s / 2); }
-  if (k >= 0.95 && hits && critCd <= 0) { critCd = 3.5; freezeT = 0.3; SFX.crit(); pop(p.x, p.y - 70, bossHit ? 'CRITICAL CHEEKS!' : 'FULL CHEEKS!', PAL.gold, 30, 1.1); }
+  if (k >= 0.95 && hits && critCd <= 0) { critCd = 3.5; freezeT = 0.3; SFX.crit(); pop(p.x, p.y - 70, think ? 'BIG BRAIN BLAST!' : bossHit ? 'CRITICAL CHEEKS!' : 'FULL CHEEKS!', PAL.gold, 30, 1.1); }
   else if (k >= 0.95) pop(p.x, p.y - 56, 'FULL CHEEKS!', PAL.gold, 22, 0.8);
 }
 function tryFullMoon() {
-  if (state !== 'play' || paused || cutin || !player || player.moon < 100) return;
+  if (state !== 'play' || paused || cutin || !player || player.moon < 100 || player.moonCd > 0) return;
   startCutin({ kind: 'moon', who: 'grok', title: 'FULL MOON!', sub: 'GROKBUTT turns its back on ALL of them.', dur: 1.25, col: PAL.gold, after: fullMoon });
 }
 function fullMoon() {
-  const p = player; p.moon = 0; p.inv = 1.2;
+  const p = player; p.moon = 0; p.moonCd = MOON_CD; p.inv = 1.2; moonUses++;
   flashT = 1; addShake(22); SFX.boom(); SFX.blast(1); SFX.applause();
   fxRings.push({ x: p.x, y: p.y, R: 10, t: 0 });
   for (const b of ebullets) burst(b.x, b.y, 2, [PAL.gold], 100);
@@ -239,13 +251,13 @@ HOOK.attackUp = src => {
   if (src !== 'all' && p.holdSrc && src !== p.holdSrc) return;
   p.holding = false;
   if (state !== 'play' || paused || cutin) { p.charge = 0; return; }
-  if (p.holdT < 0.2) bump(); else blast(p.charge);
+  if (p.holdT < 0.2) bump(); else if (!puOn('fun')) blast(p.charge);
   p.charge = 0;
 };
 HOOK.tapUI = (pt, touch) => {
   if (pt.x > W - 46 && pt.y > H - 46) { unlockAudio(); muted = !muted; return true; }
   if (state === 'play' && pt.x > W - 46 && pt.y > 62 && pt.y < 100) { HOOK.pauseToggle(); return true; }
-  if (state === 'play' && !paused && player && player.moon >= 100 && Math.hypot(pt.x - MOONBTN.x, pt.y - MOONBTN.y) < MOONBTN.r + 6) { tryFullMoon(); return true; }
+  if (state === 'play' && !paused && player && player.moon >= 100 && player.moonCd <= 0 && Math.hypot(pt.x - MOONBTN.x, pt.y - MOONBTN.y) < MOONBTN.r + 6) { tryFullMoon(); return true; }
   return false;
 };
 const MOONBTN = { x: W - 74, y: H - 128, r: 34 };
@@ -285,8 +297,8 @@ function update(dt) {
   if (ta == null) { const n = nearestEnemy(); if (n) ta = Math.atan2(n.y - p.y, n.x - p.x); else if (ml > 0.1) ta = Math.atan2(my, mx); }
   if (ta != null && p.dash <= 0) p.aim += clamp(angDiff(p.aim, ta), -16 * dt, 16 * dt);
   // ---- charge
-  if (p.holding) { p.holdT += dt; if (p.holdT > 0.2) { const pk = p.charge; p.charge = Math.min(1, (p.holdT - 0.2) / 0.8); if (Math.floor(pk * 8) !== Math.floor(p.charge * 8)) SFX.charge(p.charge); } }
-  p.cd -= dt; p.inv -= dt; p.flash = Math.max(0, p.flash - dt * 4); p.lastHit += dt; critCd -= dt;
+  if (p.holding) { p.holdT += dt; if (p.holdT > 0.2 && !puOn('fun')) { const pk = p.charge; p.charge = Math.min(1, (p.holdT - 0.2) / (puOn('think') ? 0.4 : 0.8)); if (Math.floor(pk * 8) !== Math.floor(p.charge * 8)) SFX.charge(p.charge); } }
+  p.cd -= dt; p.inv -= dt; p.moonCd = Math.max(0, p.moonCd - dt); p.flash = Math.max(0, p.flash - dt * 4); p.lastHit += dt; critCd -= dt;
   // bump hits
   if (p.dash > 0) {
     const bx = p.x + Math.cos(p.dashA) * (p.r + 6), by = p.y + Math.sin(p.dashA) * (p.r + 6);
@@ -295,6 +307,7 @@ function update(dt) {
     for (const b of blocks) if (b.t >= b.rise && !p.hitSet.has(b) && Math.abs(bx - (b.x + b.s / 2)) < b.s / 2 + 14 && Math.abs(by - (b.y + b.s / 2)) < b.s / 2 + 14) { p.hitSet.add(b); b.hp--; SFX.pixel(); if (b.hp <= 0) for (let i = 0; i < 4; i++) pixelBit(b.x + b.s / 2, b.y + b.s / 2); }
   }
   // ---- spawns
+  const pdt = dt; dt = dt * puWorldScale(); // THINK MODE slows the rivals, not GROKBUTT
   for (const s of spawns) { s.t += dt; if (s.t > 0.7 && !s.done) { s.done = true; spawnEnemy(s.type, s.x, s.y); puff(s.x, s.y, 6, 'rgba(255,220,150,0.35)'); } }
   prune(spawns, s => !s.done);
   // ---- enemies
@@ -342,9 +355,11 @@ function update(dt) {
   prune(tele, t => t.t < t.life);
   for (const b of blocks) { const was = b.t >= b.rise; b.t += dt; if (!was && b.t >= b.rise) { if (circleRect(p, p.r, b)) hurtPlayer(6, b.x + b.s / 2, b.y + b.s / 2, 'PIXEL WALL'); } }
   prune(blocks, b => b.t < b.life && b.hp > 0);
+  dt = pdt;
   // ---- loot (applause tickets)
   for (const l of loot) { l.t += dt; if (Math.hypot(l.x - p.x, l.y - p.y) < 32) { l.got = true; p.shy = Math.max(0, p.shy - 10); SFX.applause(); pop(l.x, l.y - 30, 'APPLAUSE! -10% SHY', PAL.teal, 18, 1); confetti(l.x, l.y, 10); } }
   prune(loot, l => !l.got && l.t < l.life);
+  puUpdate(dt);
   comboT -= dt; if (comboT <= 0) combo = 0;
   updateWave(dt);
   updateFx(dt);
@@ -356,7 +371,7 @@ function updateFx(dt) {
   for (const q of pops) q.t += dt; prune(pops, q => q.t < q.life);
   for (const w of wins) w.t += dt; prune(wins, w => w.t < w.life);
   for (const b of blasts) b.t += dt; prune(blasts, b => b.t < 0.35);
-  for (const r of fxRings) { r.t += dt; r.R += 1300 * dt; } prune(fxRings, r => r.t < 0.8);
+  for (const r of fxRings) { r.t += dt; r.R += (r.speed || 1300) * dt; } prune(fxRings, r => r.t < (r.maxT || 0.8));
   if (banner) { banner.t += dt; if (banner.t > banner.life) banner = null; }
   if (player) { spot.x = lerp(spot.x, player.x, Math.min(1, dt * 4)); spot.y = lerp(spot.y, player.y, Math.min(1, dt * 4)); }
 }
