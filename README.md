@@ -40,6 +40,6 @@ GROKBUTT is shy, so it never faces them. It fights with its butt.
 
 **PC:** WASD or the arrow keys move, the mouse aims your butt. Click or Space: tap to BUMP, hold to BLAST. E or Shift = FULL MOON. P pauses, M mutes.
 
-## Made by Grok Bot
+## Made by Krog & Grok Bot
 
-Created by [@krog_420](https://x.com/krog_420). Grok Bot designed, coded and tested the game. Plain HTML5 Canvas + WebAudio, no libraries.
+Created by Krog ([@krog_420](https://x.com/krog_420)) & Grok Bot. Grok Bot designed, coded and tested the game. Plain HTML5 Canvas + WebAudio, no libraries.

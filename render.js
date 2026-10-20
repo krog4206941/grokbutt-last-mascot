@@ -512,11 +512,12 @@ function drawTitleScene(c, t, forCard) {
   if (!forCard) {
     const pulse = 1 + 0.06 * Math.sin(t * 6);
     c.save(); c.translate(320, 380); c.scale(pulse, pulse); strokeText(c, ctrlMode === 'touch' ? 'TAP TO AUDITION' : 'CLICK / SPACE TO AUDITION', 0, 0, 26, PAL.gold, '#120712', 6); c.restore();
-    c.fillStyle = 'rgba(12,6,16,0.78)'; rr(c, 40, 404, 560, 38, 9); c.fill();
+    c.fillStyle = 'rgba(12,6,16,0.78)'; rr(c, 40, 404, 560, 50, 9); c.fill();
     c.font = `bold 10.5px ${FONT}`; c.fillStyle = '#fff4dc';
     c.fillText(ctrlMode === 'touch' ? 'LEFT: drag to move · RIGHT: tap = BUTT BUMP, hold = BUTT BLAST' : 'WASD move · MOUSE aims your butt · CLICK/SPACE: tap = BUMP, hold = BLAST · E = FULL MOON', 320, 416);
     c.fillStyle = '#9ffcf2'; c.fillText('Every hit makes GROKBUTT shyer: slower, but its butt hits HARDER.', 320, 431);
     if (best) { c.font = `bold 11px ${FONT}`; c.fillStyle = PAL.gold2; c.fillText('BEST ' + best, 320, 168); }
+    c.font = `bold 9.5px ${FONT}`; c.fillStyle = PAL.gold2; c.fillText('Made by Krog & Grok Bot', 320, 445);
   }
   c.drawImage(fgCanvas, 0, H - 60, W, 60);
 }
@@ -557,6 +558,7 @@ function drawWin(c) {
   c.font = `bold 12px ${FONT}`; c.fillStyle = '#9ffcf2'; c.fillText('It never once showed its face.', 320, 260);
   strokeText(c, 'SCORE ' + score, 320, 300, 28, '#fff4dc', '#120712', 6);
   c.font = `bold 12px ${FONT}`; c.fillStyle = PAL.gold2; c.fillText('TIME ' + Math.floor(timeAlive / 60) + ':' + String(Math.floor(timeAlive % 60)).padStart(2, '0') + ' · BEST ' + best, 320, 326);
+  c.font = `bold 11px ${FONT}`; c.fillStyle = 'rgba(255,244,220,0.85)'; c.fillText('Made by Krog & Grok Bot', 320, 346);
   if (stateT > 0.9 && Math.floor(stateT * 2.2) % 2 === 0) strokeText(c, ctrlMode === 'touch' ? 'TAP TO PLAY AGAIN' : 'CLICK / SPACE TO PLAY AGAIN', 320, 620 - 18, 18, PAL.gold, '#120712', 5);
   c.drawImage(fgCanvas, 0, H - 60, W, 60);
 }
@@ -566,7 +568,7 @@ function drawCard(c) { // share image
   c.save(); c.translate(320, 392); c.fillStyle = PAL.gold; rr(c, -120, -20, 240, 40, 20); c.fill(); c.strokeStyle = '#120712'; c.lineWidth = 4; c.stroke();
   c.fillStyle = '#120712'; c.beginPath(); c.moveTo(-92, -10); c.lineTo(-92, 10); c.lineTo(-76, 0); c.fill();
   c.font = `900 17px ${FONT}`; c.fillText('PLAY FREE NOW', 12, 1); c.restore();
-  c.font = `bold 12px ${FONT}`; c.fillStyle = '#fff4dc'; c.fillText('Made by Grok Bot for @krog_420', 320, 428);
+  c.font = `bold 12px ${FONT}`; c.fillStyle = '#fff4dc'; c.fillText('Made by Krog & Grok Bot', 320, 428);
 }
 function drawPause(c) {
   c.fillStyle = 'rgba(6,2,10,0.75)'; c.fillRect(0, 0, W, H);
